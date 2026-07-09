@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Inventario Pokémon</title>
+
+<!-- iOS: permette "Aggiungi a Home" e apertura a schermo intero senza barra Safari -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Inventario PKM" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#12141c" />
+
+<!-- Icona per la home di iPhone (emoji renderizzata su sfondo scuro) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%2312141c'/%3E%3Ctext x='90' y='118' font-size='96' text-anchor='middle'%3E%F0%9F%83%8F%3C/text%3E%3C/svg%3E" />
+
+<style>
+  html, body { margin: 0; padding: 0; background: #12141c; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading-screen" id="loadingScreen">Apertura del raccoglitore…</div>
+</div>
+
+<style>
+  :root {
+    --bg: #12141c;
+    --panel: #1b1e2a;
+    --panel-alt: #232637;
+    --border: #2e3245;
+    --foil: #c9a876;
+    --foil-soft: rgba(201, 168, 118, 0.16);
+    --teal: #4fb8a8;
+    --text: #edeae2;
+    --text-muted: #8b8fa3;
+    --positive: #6fbf73;
+    --negative: #d9695f;
+    --radius: 10px;
+    --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  #app {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+
+  .loading-screen {
+    display: flex; align-items: center; justify-content: center;
+    height: 60vh; color: var(--text-muted);
+    font-family: var(--font-display); font-style: italic; font-size: 15px;
+  }
+
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  .title-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 22px; flex-wrap: wrap; gap: 10px;
+  }
+  .title-row h1 { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: 0.3px; margin: 0; }
+  .title-row .actions { display: flex; align-items: center; gap: 10px; }
+  .title-row .sub { color: var(--text-muted); font-size: 13px; }
+
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+    padding: 7px 12px; border-radius: 7px; cursor: pointer; font-size: 12px; font-family: var(--font-body);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+
+  .hero {
+    background: linear-gradient(155deg, var(--panel) 0%, var(--panel-alt) 100%);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 24px; display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 18px; margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--foil), transparent);
+  }
+  .hero-stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 6px; }
+  .hero-stat .value { font-family: var(--font-mono); font-size: 25px; font-variant-numeric: tabular-nums; }
+  .hero-stat .value.positive { color: var(--positive); }
+  .hero-stat .value.negative { color: var(--negative); }
+  .hero-stat .pct { font-size: 13px; margin-left: 8px; color: var(--text-muted); }
+
+  .insights {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .card h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-muted);
+    margin: 0 0 12px; font-family: var(--font-body); font-weight: 600;
+  }
+  .card .empty-hint { font-size: 12px; color: var(--text-muted); }
+
+  .mover-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .mover-row:last-child { border-bottom: none; }
+  .mover-name { color: var(--text); max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mover-diff { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .cat-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 6px 0; }
+  .cat-bar-wrap { flex: 1; height: 5px; background: var(--panel-alt); border-radius: 4px; margin: 0 10px; overflow: hidden; }
+  .cat-bar { height: 100%; background: var(--foil); border-radius: 4px; }
+  .cat-name { width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+  .cat-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; width: 30%; text-align: right; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+  .tab { padding: 7px 14px; border-radius: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; border: none; background: transparent; font-family: var(--font-body); transition: background 0.15s, color 0.15s; }
+  .tab.active { background: var(--foil-soft); color: var(--foil); }
+
+  select, input[type="text"], input[type="number"], input[type="date"] {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 8px 10px; font-size: 13px; font-family: var(--font-body);
+  }
+  select:focus, input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+  .search-input { flex: 1; min-width: 160px; }
+  .btn-add { margin-left: auto; background: var(--foil); color: #1b1a15; border: none; font-weight: 600; padding: 9px 16px; border-radius: 7px; cursor: pointer; font-size: 13px; font-family: var(--font-body); transition: filter 0.15s; }
+  .btn-add:hover { filter: brightness(1.08); }
+
+  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; padding: 11px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .arrow { font-size: 10px; margin-left: 3px; opacity: 0.7; }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--panel-alt); }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+  .name-cell { display: flex; align-items: center; gap: 10px; }
+  .thumb { width: 34px; height: 34px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; }
+  .thumb-placeholder { width: 34px; height: 34px; border-radius: 6px; border: 1px dashed var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-muted); }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-muted); }
+  .tag.carta { color: var(--teal); border-color: rgba(79,184,168,0.4); }
+  .tag.sigillato { color: var(--foil); border-color: rgba(201,168,118,0.4); }
+  .diff.positive { color: var(--positive); }
+  .diff.negative { color: var(--negative); }
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .icon-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: 12px; font-family: var(--font-body); }
+  .icon-btn:hover { color: var(--text); border-color: var(--text-muted); }
+  .icon-btn.danger { color: var(--negative); }
+  tfoot td { padding: 12px; font-size: 12px; color: var(--text-muted); background: var(--panel-alt); }
+  tfoot .num { color: var(--text); font-weight: 600; }
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+  .empty-state .big { font-family: var(--font-display); font-size: 17px; color: var(--text); margin-bottom: 6px; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,10,14,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; overflow-y: auto; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 440px; margin: auto; }
+  .modal h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+  .field input, .field select { width: 100%; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+
+  .photo-field { display: flex; align-items: center; gap: 12px; }
+  .photo-preview { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
+  .photo-preview-placeholder { width: 56px; height: 56px; border-radius: 8px; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 11px; text-align: center; }
+  .photo-buttons { display: flex; flex-direction: column; gap: 6px; }
+  .photo-buttons label { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; text-align: center; }
+  .photo-buttons button { background: transparent; border: 1px solid var(--border); color: var(--negative); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .photo-buttons input[type="file"] { display: none; }
+
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 8px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; font-family: var(--font-body); }
+  .btn-primary { background: var(--foil); color: #1b1a15; border: none; font-weight: 600; padding: 8px 16px; border-radius: 7px; cursor: pointer; font-size: 13px; font-family: var(--font-body); }
+
+  .error-banner { background: rgba(217,105,95,0.14); border: 1px solid rgba(217,105,95,0.4); color: var(--negative); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+
+  .chart-svg { width: 100%; height: 90px; display: block; }
+  .chart-empty { display: flex; align-items: center; justify-content: center; height: 90px; color: var(--text-muted); font-size: 12px; }
+  .chart-range { font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 6px; }
+
+  @media (max-width: 900px) {
+    .insights { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .hero { grid-template-columns: 1fr; }
+    thead th:nth-child(2), tbody td:nth-child(2) { display: none; }
+  }
+</style>
+
+<script>
+(function () {
+  const ITEMS_KEY = 'items';
+  const HISTORY_KEY = 'valueHistory';
+  const SYNC_CODE_KEY = 'syncCode';
+  const SUPABASE_URL = 'https://ymubtwbfggepbdrjdhkb.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_eOgaykHvZsbxxn_wAu0upA_89WGEnr-';
+  const CATEGORY_PRESETS = [
+    'Carta singola', 'Set Allenatore di Fuoriclasse', 'Box', 'Bustina (Booster Pack)',
+    'Display', 'Elite Trainer Box (ETB)', 'Bundle', 'Tin', 'Mazzo (Deck)', 'Altro'
+  ];
+
+  let items = [];
+  let history = [];
+  let filter = { tipo: 'tutti', categoria: 'tutte', search: '' };
+  let sort = { key: null, dir: 1 };
+  let confirmDeleteId = null;
+  let storageError = null;
+  let pendingPhoto = { dataUrl: null, removed: false };
+  let syncCode = null;
+  let syncStatus = 'idle'; // idle | syncing | ok | error
+
+  const app = document.getElementById('app');
+  let heroEl, insightsEl, tableEl, catFilterEl, searchInputEl, bannerEl, itemCountEl, syncBtnEl;
+
+  function fmtEUR(n) {
+    return (n || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+  }
+  function fmtDate(d) {
+    return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+  }
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+  function uid() {
+    return (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  }
+
+  function genSyncCode() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // esclude caratteri ambigui (0/O, 1/I, ecc.)
+    let code = '';
+    for (let i = 0; i < 8; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    return code.slice(0, 4) + '-' + code.slice(4);
+  }
+
+  async function cloudPull(code) {
+    const url = `${SUPABASE_URL}/rest/v1/inventory_sync?sync_code=eq.${encodeURIComponent(code)}&select=items,history,updated_at`;
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    if (!res.ok) throw new Error('pull failed: ' + res.status);
+    const data = await res.json();
+    return data[0] || null;
+  }
+
+  async function cloudPush(code, itemsData, historyData) {
+    const url = `${SUPABASE_URL}/rest/v1/inventory_sync?on_conflict=sync_code`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ sync_code: code, items: itemsData, history: historyData, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('push failed: ' + res.status);
+  }
+
+  function resizeImage(file, maxDim) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function loadItems() {
+    try {
+      const raw = localStorage.getItem(ITEMS_KEY);
+      items = raw ? JSON.parse(raw) : [];
+    } catch (e) { items = []; }
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      history = raw ? JSON.parse(raw) : [];
+    } catch (e) { history = []; }
+
+    syncCode = localStorage.getItem(SYNC_CODE_KEY);
+    if (!syncCode) {
+      syncCode = genSyncCode();
+      localStorage.setItem(SYNC_CODE_KEY, syncCode);
+    }
+
+    buildShell();
+    refreshAll();
+
+    // Tenta il collegamento al cloud in background, senza bloccare l'avvio
+    syncStatus = 'syncing';
+    renderSyncButton();
+    try {
+      const remote = await cloudPull(syncCode);
+      if (remote) {
+        // Il cloud ha già dei dati per questo codice: li usiamo come riferimento
+        items = remote.items || [];
+        history = remote.history || [];
+        localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        refreshAll();
+      } else {
+        // Nessun dato cloud per questo codice: pubblica quello che c'è in locale
+        await cloudPush(syncCode, items, history);
+      }
+      syncStatus = 'ok';
+    } catch (e) {
+      syncStatus = 'error';
+    }
+    renderSyncButton();
+  }
+
+  async function persist() {
+    try {
+      localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+      storageError = null;
+    } catch (e) {
+      storageError = 'Non sono riuscito a salvare le modifiche. Lo spazio del browser potrebbe essere pieno (capita con molte foto ad alta risoluzione).';
+    }
+    updateHistorySnapshot();
+    renderBanner();
+
+    syncStatus = 'syncing';
+    renderSyncButton();
+    try {
+      await cloudPush(syncCode, items, history);
+      syncStatus = 'ok';
+    } catch (e) {
+      syncStatus = 'error';
+    }
+    renderSyncButton();
+  }
+
+  async function updateHistorySnapshot() {
+    const t = computeTotals(items);
+    const today = todayStr();
+    const idx = history.findIndex(h => h.date === today);
+    if (idx >= 0) history[idx].value = t.value;
+    else history.push({ date: today, value: t.value });
+    history.sort((a, b) => a.date.localeCompare(b.date));
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (e) { /* non bloccante */ }
+    renderChart();
+  }
+
+  function renderSyncButton() {
+    if (!syncBtnEl) return;
+    const label = { idle: 'Sincronizzazione', syncing: 'Sincronizzo…', ok: 'Sincronizzato ✓', error: 'Non sincronizzato ⚠' }[syncStatus];
+    syncBtnEl.textContent = label;
+  }
+
+  async function manualCloudRefresh(overlay) {
+    const statusEl = overlay.querySelector('#syncModalStatus');
+    statusEl.textContent = 'Aggiornamento in corso…';
+    try {
+      const remote = await cloudPull(syncCode);
+      if (remote) {
+        items = remote.items || [];
+        history = remote.history || [];
+        localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        refreshAll();
+        syncStatus = 'ok';
+        statusEl.textContent = 'Dati aggiornati dal cloud.';
+      } else {
+        statusEl.textContent = 'Nessun dato trovato in cloud per questo codice.';
+      }
+    } catch (e) {
+      syncStatus = 'error';
+      statusEl.textContent = 'Non sono riuscito a contattare il cloud. Controlla la connessione.';
+    }
+    renderSyncButton();
+  }
+
+  async function linkNewCode(overlay, newCode) {
+    const statusEl = overlay.querySelector('#syncModalStatus');
+    const trimmed = newCode.trim().toUpperCase();
+    if (!trimmed) return;
+    statusEl.textContent = 'Collegamento in corso…';
+    try {
+      const remote = await cloudPull(trimmed);
+      if (remote) {
+        items = remote.items || [];
+        history = remote.history || [];
+      } else {
+        // Codice non ancora esistente in cloud: lo creiamo con i dati attuali
+        await cloudPush(trimmed, items, history);
+      }
+      syncCode = trimmed;
+      localStorage.setItem(SYNC_CODE_KEY, syncCode);
+      localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      refreshAll();
+      syncStatus = 'ok';
+      renderSyncButton();
+      closeModal(overlay);
+    } catch (e) {
+      statusEl.textContent = 'Codice non valido o cloud non raggiungibile. Riprova.';
+    }
+  }
+
+  function renderSyncModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Sincronizzazione tra dispositivi</h2>
+        <div class="field">
+          <label>Il tuo codice attuale</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" value="${syncCode}" readonly style="font-family: var(--font-mono); letter-spacing: 1px;" id="currentCodeInput" />
+            <button type="button" class="btn-secondary" id="copyCodeBtn">Copia</button>
+          </div>
+          <div style="font-size:11px; color: var(--text-muted); margin-top:6px;">
+            Inserisci questo stesso codice sull'altro dispositivo per vedere qui la stessa collezione.
+          </div>
+        </div>
+        <div class="field">
+          <label>Collega un altro codice (sostituisce i dati locali con quelli del codice inserito)</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="linkCodeInput" placeholder="Es. AB12-CD34" style="font-family: var(--font-mono);" />
+            <button type="button" class="btn-secondary" id="linkCodeBtn">Collega</button>
+          </div>
+        </div>
+        <div class="field">
+          <button type="button" class="btn-secondary" id="refreshCloudBtn">Aggiorna ora dal cloud</button>
+        </div>
+        <div id="syncModalStatus" style="font-size:12px; color: var(--text-muted); min-height: 16px;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-primary" id="closeSyncBtn">Chiudi</button>
+        </div>
+      </div>
+    `;
+    overlay.querySelector('#copyCodeBtn').onclick = () => {
+      const input = overlay.querySelector('#currentCodeInput');
+      input.select();
+      navigator.clipboard && navigator.clipboard.writeText(syncCode).catch(() => {});
+      overlay.querySelector('#syncModalStatus').textContent = 'Codice copiato.';
+    };
+    overlay.querySelector('#linkCodeBtn').onclick = () => {
+      const val = overlay.querySelector('#linkCodeInput').value;
+      linkNewCode(overlay, val);
+    };
+    overlay.querySelector('#refreshCloudBtn').onclick = () => manualCloudRefresh(overlay);
+    overlay.querySelector('#closeSyncBtn').onclick = () => closeModal(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
+    return overlay;
+  }
+
+  function computeTotals(list) {
+    let cost = 0, value = 0;
+    list.forEach(it => { cost += it.prezzoAcquisto * it.quantita; value += it.valoreAttuale * it.quantita; });
+    return { cost, value, diff: value - cost, pct: cost > 0 ? ((value - cost) / cost) * 100 : 0 };
+  }
+
+  function filteredItems() {
+    return items.filter(it => {
+      if (filter.tipo !== 'tutti' && it.tipo !== filter.tipo) return false;
+      if (filter.categoria !== 'tutte' && it.categoria !== filter.categoria) return false;
+      if (filter.search && !it.nome.toLowerCase().includes(filter.search.toLowerCase())) return false;
+      return true;
+    });
+  }
+
+  function sortedItems(list) {
+    if (!sort.key) return list;
+    const key = sort.key;
+    const withMetrics = list.map(it => ({
+      it,
+      totVal: it.valoreAttuale * it.quantita,
+      totCost: it.prezzoAcquisto * it.quantita,
+      diff: (it.valoreAttuale - it.prezzoAcquisto) * it.quantita
+    }));
+    withMetrics.sort((a, b) => {
+      let av, bv;
+      switch (key) {
+        case 'nome': av = a.it.nome.toLowerCase(); bv = b.it.nome.toLowerCase(); break;
+        case 'tipo': av = a.it.tipo; bv = b.it.tipo; break;
+        case 'categoria': av = a.it.categoria.toLowerCase(); bv = b.it.categoria.toLowerCase(); break;
+        case 'quantita': av = a.it.quantita; bv = b.it.quantita; break;
+        case 'prezzoAcquisto': av = a.it.prezzoAcquisto; bv = b.it.prezzoAcquisto; break;
+        case 'valoreAttuale': av = a.it.valoreAttuale; bv = b.it.valoreAttuale; break;
+        case 'totVal': av = a.totVal; bv = b.totVal; break;
+        case 'diff': av = a.diff; bv = b.diff; break;
+        default: av = 0; bv = 0;
+      }
+      if (av < bv) return -1 * sort.dir;
+      if (av > bv) return 1 * sort.dir;
+      return 0;
+    });
+    return withMetrics.map(w => w.it);
+  }
+
+  function distinctCategories() {
+    return [...new Set(items.map(i => i.categoria))].sort();
+  }
+
+  function buildShell() {
+    const loading = document.getElementById('loadingScreen');
+    if (loading) loading.remove();
+    app.innerHTML = `
+      <div class="wrap">
+        <div class="title-row">
+          <h1>Inventario Pokémon</h1>
+          <div class="actions">
+            <span class="sub" id="itemCount"></span>
+            <button class="btn-ghost" id="syncBtn">Sincronizzazione</button>
+            <button class="btn-ghost" id="exportBtn">Esporta CSV</button>
+          </div>
+        </div>
+        <div id="bannerEl"></div>
+        <div class="hero" id="heroEl"></div>
+        <div class="insights">
+          <div class="card">
+            <h3>Andamento valore nel tempo</h3>
+            <div id="chartEl"></div>
+          </div>
+          <div class="card">
+            <h3>Migliori / peggiori</h3>
+            <div id="moversEl"></div>
+          </div>
+          <div class="card">
+            <h3>Valore per categoria</h3>
+            <div id="categoryTotalsEl"></div>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="tabs">
+            <button class="tab" data-tipo="tutti">Tutti</button>
+            <button class="tab" data-tipo="carta">Carte</button>
+            <button class="tab" data-tipo="sigillato">Sigillati</button>
+          </div>
+          <select id="catFilter"><option value="tutte">Tutte le categorie</option></select>
+          <input class="search-input" id="searchInput" type="text" placeholder="Cerca per nome…" />
+          <button class="btn-add" id="addBtn">+ Aggiungi prodotto</button>
+        </div>
+        <div class="table-wrap" id="tableEl"></div>
+      </div>
+    `;
+    heroEl = document.getElementById('heroEl');
+    tableEl = document.getElementById('tableEl');
+    catFilterEl = document.getElementById('catFilter');
+    searchInputEl = document.getElementById('searchInput');
+    bannerEl = document.getElementById('bannerEl');
+    itemCountEl = document.getElementById('itemCount');
+    syncBtnEl = document.getElementById('syncBtn');
+
+    app.querySelectorAll('[data-tipo]').forEach(btn => {
+      btn.onclick = () => { filter.tipo = btn.dataset.tipo; confirmDeleteId = null; renderTabs(); renderTable(); };
+    });
+    catFilterEl.onchange = (e) => { filter.categoria = e.target.value; confirmDeleteId = null; renderTable(); };
+    searchInputEl.oninput = (e) => { filter.search = e.target.value; confirmDeleteId = null; renderTable(); };
+    document.getElementById('addBtn').onclick = () => openModal(null);
+    document.getElementById('exportBtn').onclick = exportCSV;
+    syncBtnEl.onclick = () => document.body.appendChild(renderSyncModal());
+  }
+
+  function refreshAll() {
+    renderBanner();
+    renderHero();
+    renderChart();
+    renderMovers();
+    renderCategoryTotals();
+    renderCategoryOptions();
+    renderTabs();
+    renderTable();
+    itemCountEl.textContent = items.length + (items.length === 1 ? ' prodotto in raccolta' : ' prodotti in raccolta');
+  }
+
+  function renderBanner() {
+    bannerEl.innerHTML = storageError ? `<div class="error-banner">${storageError}</div>` : '';
+  }
+
+  function renderHero() {
+    const t = computeTotals(items);
+    heroEl.innerHTML = `
+      <div class="hero-stat"><div class="label">Totale investito</div><div class="value">${fmtEUR(t.cost)}</div></div>
+      <div class="hero-stat"><div class="label">Valore attuale</div><div class="value">${fmtEUR(t.value)}</div></div>
+      <div class="hero-stat">
+        <div class="label">Plus / minus</div>
+        <div class="value ${t.diff >= 0 ? 'positive' : 'negative'}">
+          ${t.diff >= 0 ? '+' : ''}${fmtEUR(t.diff)}
+          <span class="pct">${t.cost > 0 ? (t.pct >= 0 ? '+' : '') + t.pct.toFixed(1) + '%' : ''}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderChart() {
+    const chartEl = document.getElementById('chartEl');
+    if (!chartEl) return;
+    if (history.length < 2) {
+      chartEl.innerHTML = `<div class="chart-empty">Servono almeno 2 rilevazioni per un grafico. Torna dopo un aggiornamento futuro.</div>`;
+      return;
+    }
+    const w = 300, h = 90, pad = 6;
+    const values = history.map(h => h.value);
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = max - min || 1;
+    const stepX = (w - pad * 2) / (history.length - 1);
+    const points = history.map((h, i) => {
+      const x = pad + i * stepX;
+      const y = h - 0; // noop
+      const yVal = pad + (h.value === undefined ? 0 : (1 - (h.value - min) / range) * (90 - pad * 2));
+      return `${x.toFixed(1)},${yVal.toFixed(1)}`;
+    }).join(' ');
+    const last = history[history.length - 1].value;
+    const first = history[0].value;
+    const trendColor = last >= first ? 'var(--positive)' : 'var(--negative)';
+    chartEl.innerHTML = `
+      <svg class="chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <polyline points="${points}" fill="none" stroke="${trendColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </svg>
+      <div class="chart-range">
+        <span>${fmtDate(history[0].date)} · ${fmtEUR(first)}</span>
+        <span>${fmtDate(history[history.length - 1].date)} · ${fmtEUR(last)}</span>
+      </div>
+    `;
+  }
+
+  function renderMovers() {
+    const moversEl = document.getElementById('moversEl');
+    if (!moversEl) return;
+    if (items.length === 0) {
+      moversEl.innerHTML = `<div class="empty-hint">Aggiungi qualche prodotto per vedere i migliori e i peggiori.</div>`;
+      return;
+    }
+    const withDiff = items.map(it => ({ nome: it.nome, diff: (it.valoreAttuale - it.prezzoAcquisto) * it.quantita }));
+    const gainers = [...withDiff].sort((a, b) => b.diff - a.diff).slice(0, 3).filter(x => x.diff > 0);
+    const losers = [...withDiff].sort((a, b) => a.diff - b.diff).slice(0, 3).filter(x => x.diff < 0);
+    if (gainers.length === 0 && losers.length === 0) {
+      moversEl.innerHTML = `<div class="empty-hint">Nessuna differenza di valore ancora registrata.</div>`;
+      return;
+    }
+    moversEl.innerHTML =
+      gainers.map(g => `<div class="mover-row"><span class="mover-name">${g.nome}</span><span class="mover-diff positive">+${fmtEUR(g.diff)}</span></div>`).join('') +
+      losers.map(l => `<div class="mover-row"><span class="mover-name">${l.nome}</span><span class="mover-diff negative">${fmtEUR(l.diff)}</span></div>`).join('');
+  }
+
+  function renderCategoryTotals() {
+    const el = document.getElementById('categoryTotalsEl');
+    if (!el) return;
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty-hint">Nessuna categoria da mostrare.</div>`;
+      return;
+    }
+    const map = {};
+    items.forEach(it => { map[it.categoria] = (map[it.categoria] || 0) + it.valoreAttuale * it.quantita; });
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(...entries.map(e => e[1]), 1);
+    el.innerHTML = entries.map(([cat, val]) => `
+      <div class="cat-row">
+        <span class="cat-name">${cat}</span>
+        <span class="cat-bar-wrap"><span class="cat-bar" style="width:${(val / max) * 100}%"></span></span>
+        <span class="cat-value">${fmtEUR(val)}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderCategoryOptions() {
+    const cats = distinctCategories();
+    const current = filter.categoria;
+    catFilterEl.innerHTML = `<option value="tutte">Tutte le categorie</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    catFilterEl.value = cats.includes(current) ? current : 'tutte';
+    filter.categoria = catFilterEl.value;
+  }
+
+  function renderTabs() {
+    app.querySelectorAll('[data-tipo]').forEach(btn => btn.classList.toggle('active', btn.dataset.tipo === filter.tipo));
+  }
+
+  const COLS = [
+    { key: 'nome', label: 'Nome' },
+    { key: 'tipo', label: 'Tipo' },
+    { key: 'categoria', label: 'Categoria' },
+    { key: 'quantita', label: 'Qtà', num: true },
+    { key: 'prezzoAcquisto', label: 'Acquisto (cad.)', num: true },
+    { key: 'valoreAttuale', label: 'Valore (cad.)', num: true },
+    { key: 'totVal', label: 'Valore tot.', num: true },
+    { key: 'diff', label: 'Differenza', num: true }
+  ];
+
+  function renderTable() {
+    const list = sortedItems(filteredItems());
+    const isFiltered = filter.tipo !== 'tutti' || filter.categoria !== 'tutte' || filter.search;
+    const filteredTotals = computeTotals(list);
+
+    if (items.length === 0) {
+      tableEl.innerHTML = `<div class="empty-state"><div class="big">La collezione è vuota</div><div>Aggiungi la tua prima carta o prodotto sigillato per iniziare a monitorarne il valore.</div></div>`;
+      return;
+    }
+    if (list.length === 0) {
+      tableEl.innerHTML = `<div class="empty-state"><div class="big">Nessun risultato</div><div>Prova a modificare i filtri o la ricerca.</div></div>`;
+      return;
+    }
+
+    const headCells = COLS.map(c => {
+      const active = sort.key === c.key;
+      const arrow = active ? (sort.dir === 1 ? '▲' : '▼') : '';
+      return `<th data-sort="${c.key}" class="${c.num ? 'num' : ''}">${c.label}${active ? `<span class="arrow">${arrow}</span>` : ''}</th>`;
+    }).join('');
+
+    tableEl.innerHTML = `
+      <table>
+        <thead><tr>${headCells}<th></th></tr></thead>
+        <tbody>
+          ${list.map(it => {
+            const totVal = it.valoreAttuale * it.quantita;
+            const totCost = it.prezzoAcquisto * it.quantita;
+            const diff = totVal - totCost;
+            return `
+            <tr>
+              <td>
+                <div class="name-cell">
+                  ${it.foto ? `<img class="thumb" src="${it.foto}" />` : `<div class="thumb-placeholder">—</div>`}
+                  <div>
+                    ${it.nome}
+                    ${it.note ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${it.note}</div>` : ''}
+                    ${it.dataAcquisto ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Acquistato il ${fmtDate(it.dataAcquisto)}</div>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td><span class="tag ${it.tipo}">${it.tipo === 'carta' ? 'Carta' : 'Sigillato'}</span></td>
+              <td>${it.categoria}</td>
+              <td class="num">${it.quantita}</td>
+              <td class="num">${fmtEUR(it.prezzoAcquisto)}</td>
+              <td class="num">${fmtEUR(it.valoreAttuale)}</td>
+              <td class="num">${fmtEUR(totVal)}</td>
+              <td class="num diff ${diff >= 0 ? 'positive' : 'negative'}">${diff >= 0 ? '+' : ''}${fmtEUR(diff)}</td>
+              <td>
+                <div class="row-actions">
+                  <button class="icon-btn" data-edit="${it.id}">Modifica</button>
+                  <button class="icon-btn danger" data-delete="${it.id}">${confirmDeleteId === it.id ? 'Conferma' : 'Elimina'}</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+        ${isFiltered ? `
+        <tfoot><tr>
+          <td colspan="6">Subtotale filtro (${list.length} vo${list.length === 1 ? 'ce' : 'ci'})</td>
+          <td class="num">${fmtEUR(filteredTotals.value)}</td>
+          <td class="num">${filteredTotals.diff >= 0 ? '+' : ''}${fmtEUR(filteredTotals.diff)}</td>
+          <td></td>
+        </tr></tfoot>` : ''}
+      </table>
+    `;
+
+    tableEl.querySelectorAll('[data-sort]').forEach(th => {
+      th.onclick = () => {
+        const key = th.dataset.sort;
+        if (sort.key === key) sort.dir *= -1;
+        else { sort.key = key; sort.dir = 1; }
+        renderTable();
+      };
+    });
+    tableEl.querySelectorAll('[data-edit]').forEach(btn => { btn.onclick = () => openModal(items.find(i => i.id === btn.dataset.edit)); });
+    tableEl.querySelectorAll('[data-delete]').forEach(btn => { btn.onclick = () => handleDelete(btn.dataset.delete); });
+  }
+
+  function handleDelete(id) {
+    if (confirmDeleteId === id) {
+      items = items.filter(it => it.id !== id);
+      confirmDeleteId = null;
+      renderHero(); renderChart(); renderMovers(); renderCategoryTotals(); renderCategoryOptions(); renderTable();
+      itemCountEl.textContent = items.length + (items.length === 1 ? ' prodotto in raccolta' : ' prodotti in raccolta');
+      persist();
+    } else {
+      confirmDeleteId = id;
+      renderTable();
+    }
+  }
+
+  function openModal(item) {
+    pendingPhoto = { dataUrl: item ? item.foto || null : null, removed: false };
+    document.body.appendChild(renderModal(item));
+  }
+  function closeModal(overlay) { overlay.remove(); }
+
+  function renderModal(existingItem) {
+    const it = existingItem || { tipo: 'carta', categoria: '', nome: '', quantita: 1, prezzoAcquisto: '', valoreAttuale: '', note: '', foto: null, dataAcquisto: '' };
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>${existingItem ? 'Modifica prodotto' : 'Aggiungi prodotto'}</h2>
+        <form id="itemForm">
+          <div class="field">
+            <label>Foto (opzionale)</label>
+            <div class="photo-field">
+              <div id="photoPreviewWrap">
+                ${it.foto ? `<img class="photo-preview" id="photoPreviewImg" src="${it.foto}" />` : `<div class="photo-preview-placeholder" id="photoPreviewImg">Nessuna foto</div>`}
+              </div>
+              <div class="photo-buttons">
+                <label for="photoInput">Carica foto</label>
+                <input type="file" id="photoInput" accept="image/*" />
+                <button type="button" id="removePhotoBtn">Rimuovi foto</button>
+              </div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Tipo</label>
+              <select name="tipo">
+                <option value="carta" ${it.tipo === 'carta' ? 'selected' : ''}>Carta</option>
+                <option value="sigillato" ${it.tipo === 'sigillato' ? 'selected' : ''}>Sigillato</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Categoria</label>
+              <input name="categoria" list="catList" value="${it.categoria}" placeholder="Es. Box" />
+              <datalist id="catList">${CATEGORY_PRESETS.map(c => `<option value="${c}">`).join('')}</datalist>
+            </div>
+          </div>
+          <div class="field">
+            <label>Nome prodotto</label>
+            <input name="nome" type="text" value="${it.nome}" placeholder="Es. Charizard ex 151" required />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Quantità</label>
+              <input name="quantita" type="number" min="0" step="1" value="${it.quantita}" />
+            </div>
+            <div class="field">
+              <label>Prezzo acquisto (cad. €)</label>
+              <input name="prezzoAcquisto" type="number" min="0" step="0.01" value="${it.prezzoAcquisto}" />
+            </div>
+            <div class="field">
+              <label>Valore attuale (cad. €)</label>
+              <input name="valoreAttuale" type="number" min="0" step="0.01" value="${it.valoreAttuale}" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Data di acquisto (opzionale)</label>
+              <input name="dataAcquisto" type="date" value="${it.dataAcquisto || ''}" />
+            </div>
+            <div class="field">
+              <label>Note (condizione, grading, ecc.)</label>
+              <input name="note" type="text" value="${it.note || ''}" placeholder="Es. PSA 10, NM" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancelBtn">Annulla</button>
+            <button type="submit" class="btn-primary">${existingItem ? 'Salva modifiche' : 'Aggiungi'}</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const photoInput = overlay.querySelector('#photoInput');
+    const removeBtn = overlay.querySelector('#removePhotoBtn');
+    photoInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await resizeImage(file, 240);
+        pendingPhoto = { dataUrl, removed: false };
+        updatePhotoPreview(overlay);
+      } catch (err) { /* mantiene stato precedente */ }
+    };
+    removeBtn.onclick = () => { pendingPhoto = { dataUrl: null, removed: true }; updatePhotoPreview(overlay); };
+    overlay.querySelector('#cancelBtn').onclick = () => closeModal(overlay);
+    overlay.querySelector('#itemForm').onsubmit = (e) => {
+      e.preventDefault();
+      handleSubmit(e.target, existingItem ? existingItem.id : null);
+      closeModal(overlay);
+    };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
+    return overlay;
+  }
+
+  function updatePhotoPreview(overlay) {
+    const wrap = overlay.querySelector('#photoPreviewWrap');
+    wrap.innerHTML = pendingPhoto.dataUrl
+      ? `<img class="photo-preview" id="photoPreviewImg" src="${pendingPhoto.dataUrl}" />`
+      : `<div class="photo-preview-placeholder" id="photoPreviewImg">Nessuna foto</div>`;
+  }
+
+  function handleSubmit(f, existingId) {
+    const data = {
+      id: existingId || uid(),
+      tipo: f.tipo.value,
+      categoria: f.categoria.value.trim() || 'Altro',
+      nome: f.nome.value.trim(),
+      quantita: parseFloat(f.quantita.value) || 0,
+      prezzoAcquisto: parseFloat(f.prezzoAcquisto.value) || 0,
+      valoreAttuale: parseFloat(f.valoreAttuale.value) || 0,
+      dataAcquisto: f.dataAcquisto.value || '',
+      note: f.note.value.trim(),
+      foto: pendingPhoto.removed ? null : (pendingPhoto.dataUrl || null)
+    };
+    if (!data.nome) return;
+    if (existingId) items = items.map(it => it.id === existingId ? data : it);
+    else items.push(data);
+    renderHero(); renderChart(); renderMovers(); renderCategoryTotals(); renderCategoryOptions(); renderTable();
+    itemCountEl.textContent = items.length + (items.length === 1 ? ' prodotto in raccolta' : ' prodotti in raccolta');
+    persist();
+  }
+
+  function exportCSV() {
+    const headers = ['Nome', 'Tipo', 'Categoria', 'Quantita', 'Prezzo acquisto cad', 'Valore attuale cad', 'Valore totale', 'Differenza', 'Data acquisto', 'Note'];
+    const rows = items.map(it => {
+      const totVal = it.valoreAttuale * it.quantita;
+      const totCost = it.prezzoAcquisto * it.quantita;
+      const diff = totVal - totCost;
+      return [it.nome, it.tipo, it.categoria, it.quantita, it.prezzoAcquisto, it.valoreAttuale, totVal.toFixed(2), diff.toFixed(2), it.dataAcquisto || '', it.note || '']
+        .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventario-pokemon-${todayStr()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  loadItems();
+})();
+</script>
+</body>
+</html>
