@@ -169,7 +169,7 @@
 const SUPABASE_URL = "https://ymubtwbfggepbdrjdhkb.supabase.co";
 const SUPABASE_ANON_KEY = "la_tua_publishable_key_incollata_qui"; // MAI la secret/service_role qui!
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let allRows = [];
 let wishlist = JSON.parse(localStorage.getItem("trend_wishlist") || "{}"); // { card_id: {target, dir} }
@@ -179,7 +179,7 @@ function saveWishlist() {
 }
 
 async function loadData() {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("trend_summary")
     .select("*")
     .limit(20000);
