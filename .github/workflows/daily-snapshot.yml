@@ -1,0 +1,28 @@
+name: Snapshot giornaliero prezzi Pokémon TCG
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # ogni giorno alle 06:00 UTC (le 07:00/08:00 in Italia a seconda dell'ora legale)
+  workflow_dispatch: {}    # permette di farlo girare anche a mano dalla tab Actions
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Installa dipendenze
+        run: npm install
+
+      - name: Esegui lo snapshot
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          POKEMONTCG_API_KEY: ${{ secrets.POKEMONTCG_API_KEY }}
+        run: npm run fetch
