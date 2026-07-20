@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trend Pokémon TCG</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --surface: #ffffff;
+    --surface-2: #fafafa;
+    --border: #e3e3e6;
+    --text: #1c1c1f;
+    --text-secondary: #6b6b70;
+    --text-muted: #9a9a9f;
+    --success-bg: #e6f6ec;
+    --success-text: #1a7f43;
+    --danger-bg: #fdeaea;
+    --danger-text: #c53030;
+    --warning-bg: #fdf3d8;
+    --warning-text: #8a5a00;
+    --accent-bg: #eef0fb;
+    --accent-text: #3c3489;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+  .controls { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .controls.second { margin-bottom: 16px; }
+  input, select {
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .search-box { position: relative; flex: 1; min-width: 150px; }
+  .search-box input { width: 100%; padding-left: 30px; }
+  .search-box::before {
+    content: "🔍";
+    position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; opacity: 0.5;
+  }
+  .note { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 560px) { .cols { grid-template-columns: 1fr; } }
+  .col-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
+  .row {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .row-main { display: flex; gap: 10px; align-items: center; min-width: 0; flex: 1; }
+  .thumb {
+    width: 32px; height: 44px; border-radius: 4px; background: var(--surface);
+    border: 1px solid var(--border); flex-shrink: 0; object-fit: cover;
+  }
+  .row-name { margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sub { margin: 0; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: var(--radius); display: inline-block; }
+  .badge.up { background: var(--success-bg); color: var(--success-text); }
+  .badge.down { background: var(--danger-bg); color: var(--danger-text); }
+  .badge.spike { background: var(--warning-bg); color: var(--warning-text); margin-top: 3px; margin-right: 4px; }
+  .badge.ath { background: var(--accent-bg); color: var(--accent-text); margin-top: 3px; margin-right: 4px; }
+  .wish-btn { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+  .price-block { text-align: right; }
+  .price-sub { font-size: 11px; color: var(--text-muted); }
+  .detail {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.25rem; position: relative; margin-bottom: 20px; display: none;
+  }
+  .detail.open { display: block; }
+  .close-btn {
+    position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
+    border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer;
+  }
+  .empty { font-size: 13px; color: var(--text-muted); padding: 8px 0; }
+  .loading { font-size: 13px; color: var(--text-muted); padding: 20px 0; text-align: center; }
+  svg.chart { width: 100%; height: 60px; display: block; margin-top: 8px; }
+  .target-set { font-size: 12px; color: var(--accent-text); background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Trend Pokémon TCG</h1>
+
+  <div class="banner">
+    <span>Ultimo aggiornamento dati</span>
+    <span id="lastUpdate">—</span>
+  </div>
+
+  <div class="controls">
+    <div class="search-box"><input id="search" type="text" placeholder="Cerca una carta" /></div>
+    <select id="marketFilter">
+      <option value="eur">IT (EUR)</option>
+      <option value="usd">EN (USD)</option>
+    </select>
+    <select id="timeFilter">
+      <option value="day">Oggi</option>
+      <option value="7d" selected>7 giorni</option>
+      <option value="30d">30 giorni</option>
+    </select>
+  </div>
+  <div class="controls second">
+    <select id="minPrice">
+      <option value="0">Tutte le carte</option>
+      <option value="5">Solo sopra 5</option>
+      <option value="20">Solo sopra 20</option>
+      <option value="50">Solo sopra 50</option>
+    </select>
+    <select id="metricMode">
+      <option value="pct">Ordina per %</option>
+    </select>
+  </div>
+
+  <div id="searchResults" style="display:none;"></div>
+
+  <div id="mainLists">
+    <p class="note" id="marketNote"></p>
+    <div class="cols">
+      <div>
+        <p class="col-title">📈 Top 10 rialzi</p>
+        <div id="gainers"><div class="loading">Caricamento…</div></div>
+      </div>
+      <div>
+        <p class="col-title">📉 Top 10 ribassi</p>
+        <div id="losers"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="detail" class="detail"></div>
+
+  <p class="col-title">❤️ Wishlist</p>
+  <div id="wishRows"><p class="empty">Nessuna carta in wishlist. Aggiungine una dal cuoricino sulle liste sopra.</p></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// --- Configurazione: sostituisci con i tuoi valori reali ---
+const SUPABASE_URL = "https://ymubtwbfggepbdrjdhkb.supabase.co";
+const SUPABASE_ANON_KEY = "la_tua_publishable_key_incollata_qui"; // MAI la secret/service_role qui!
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let allRows = [];
+let wishlist = JSON.parse(localStorage.getItem("trend_wishlist") || "{}"); // { card_id: {target, dir} }
+
+function saveWishlist() {
+  localStorage.setItem("trend_wishlist", JSON.stringify(wishlist));
+}
+
+async function loadData() {
+  const { data, error } = await supabase
+    .from("trend_summary")
+    .select("*")
+    .limit(20000);
+  if (error) {
+    document.getElementById("gainers").innerHTML = `<p class="empty">Errore nel caricare i dati: ${error.message}</p>`;
+    console.error(error);
+    return;
+  }
+  allRows = data || [];
+  if (allRows.length) {
+    document.getElementById("lastUpdate").textContent = allRows[0].snapshot_date;
+  }
+  renderLists();
+  renderWishlist();
+}
+
+function pctField(market, time) {
+  if (time === "day") return market === "eur" ? "pct_day_eur" : "pct_day_usd";
+  if (time === "30d") return market === "eur" ? "pct_30d_eur" : "pct_30d_usd";
+  return market === "eur" ? "pct_7d_eur" : "pct_7d_usd";
+}
+function priceField(market) { return market === "eur" ? "price_eur" : "price_usd"; }
+function currencyLabel(market) { return market === "eur" ? "EUR" : "USD"; }
+
+function fmtPrice(v, market) {
+  if (v == null) return "—";
+  return v.toFixed(2) + " " + currencyLabel(market);
+}
+
+function badgeHtml(pct) {
+  if (pct == null) return `<span class="badge" style="background:var(--surface); color:var(--text-muted);">n/d</span>`;
+  const cls = pct >= 0 ? "up" : "down";
+  return `<span class="badge ${cls}">${pct > 0 ? "+" : ""}${pct}%</span>`;
+}
+
+function rowHtml(r, market, time) {
+  const pct = r[pctField(market, time)];
+  const price = r[priceField(market)];
+  const filled = !!wishlist[r.card_id];
+  const img = r.image_small ? `<img class="thumb" src="${r.image_small}" alt="" loading="lazy" />` : `<div class="thumb"></div>`;
+  return `<div class="row" data-id="${r.card_id}">
+    <div class="row-main" data-open="${r.card_id}">
+      ${img}
+      <div>
+        <p class="row-name">${r.name}</p>
+        <p class="row-sub">${r.set_name || ""} · ${r.number || ""}${r.set_total ? "/" + r.set_total : ""}</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+      <div class="price-block">${badgeHtml(pct)}<div class="price-sub">${fmtPrice(price, market)}</div></div>
+      <button class="wish-btn" data-wish="${r.card_id}" aria-label="Aggiungi alla wishlist">${filled ? "❤️" : "🤍"}</button>
+    </div>
+  </div>`;
+}
+
+function renderLists() {
+  const market = document.getElementById("marketFilter").value;
+  const time = document.getElementById("timeFilter").value;
+  const minP = parseFloat(document.getElementById("minPrice").value);
+  const pField = pctField(market, time);
+  const priceF = priceField(market);
+
+  document.getElementById("marketNote").textContent =
+    (market === "eur" ? "Mercato italiano (Cardmarket, EUR)" : "Mercato inglese (TCGPlayer, USD)") +
+    (minP > 0 ? ` · solo carte sopra ${minP} ${currencyLabel(market)}` : "");
+
+  const filtered = allRows.filter(r => r[priceF] != null && r[priceF] >= minP && r[pField] != null);
+  const sorted = [...filtered].sort((a, b) => b[pField] - a[pField]);
+  const gainers = sorted.filter(r => r[pField] > 0).slice(0, 10);
+  const losers = [...sorted].reverse().filter(r => r[pField] < 0).slice(0, 10);
+
+  document.getElementById("gainers").innerHTML = gainers.length
+    ? gainers.map(r => rowHtml(r, market, time)).join("")
+    : `<p class="empty">Ancora nessun dato sufficiente per questo periodo (serve più storico accumulato).</p>`;
+  document.getElementById("losers").innerHTML = losers.length
+    ? losers.map(r => rowHtml(r, market, time)).join("")
+    : `<p class="empty">Ancora nessun dato sufficiente per questo periodo.</p>`;
+
+  bindRowEvents();
+}
+
+function bindRowEvents() {
+  document.querySelectorAll("[data-open]").forEach(el => {
+    el.addEventListener("click", () => showDetail(el.dataset.open));
+  });
+  document.querySelectorAll("[data-wish]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleWish(el.dataset.wish);
+    });
+  });
+}
+
+function toggleWish(cardId) {
+  if (wishlist[cardId]) {
+    delete wishlist[cardId];
+  } else {
+    wishlist[cardId] = { target: null, dir: "sopra" };
+  }
+  saveWishlist();
+  renderLists();
+  renderWishlist();
+}
+
+function showDetail(cardId) {
+  const r = allRows.find(x => x.card_id === cardId);
+  if (!r) return;
+  document.getElementById("mainLists").style.display = "none";
+  document.getElementById("searchResults").style.display = "none";
+  const d = document.getElementById("detail");
+  d.classList.add("open");
+  d.innerHTML = `
+    <button class="close-btn" id="closeDetail">✕</button>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px; padding-right:32px;">
+      ${r.image_small ? `<img class="thumb" src="${r.image_small}" alt="" />` : `<div class="thumb"></div>`}
+      <div>
+        <p style="margin:0; font-size:15px; font-weight:600;">${r.name}</p>
+        <p style="margin:0; font-size:12px; color:var(--text-secondary);">${r.set_name || ""} · ${r.number || ""}${r.set_total ? "/" + r.set_total : ""}</p>
+      </div>
+    </div>
+    <p style="margin:0 0 4px; font-size:13px; color:var(--text-secondary);">
+      IT: ${fmtPrice(r.price_eur, "eur")} (${badgeHtml(r.pct_7d_eur)}) · EN: ${fmtPrice(r.price_usd, "usd")} (${badgeHtml(r.pct_7d_usd)})
+    </p>
+    <p style="margin:0 0 8px; font-size:12px; color:var(--text-muted);">Variazione oggi: EN ${r.pct_day_usd ?? "n/d"}% · IT ${r.pct_day_eur ?? "n/d"}% &nbsp;·&nbsp; Variazione 30gg: EN ${r.pct_30d_usd ?? "n/d"}% · IT ${r.pct_30d_eur ?? "n/d"}%</p>
+  `;
+  document.getElementById("closeDetail").addEventListener("click", () => {
+    d.classList.remove("open");
+    document.getElementById("mainLists").style.display = "block";
+  });
+}
+
+function renderWishlist() {
+  const ids = Object.keys(wishlist);
+  const container = document.getElementById("wishRows");
+  if (!ids.length) {
+    container.innerHTML = `<p class="empty">Nessuna carta in wishlist. Aggiungine una dal cuoricino sulle liste sopra.</p>`;
+    return;
+  }
+  container.innerHTML = ids.map(id => {
+    const r = allRows.find(x => x.card_id === id);
+    if (!r) return "";
+    const w = wishlist[id];
+    const reached = w.target != null && (w.dir === "sopra" ? r.price_eur >= w.target : r.price_eur <= w.target);
+    const goalText = w.target != null
+      ? `obiettivo: ${w.dir} ${w.target} EUR ${reached ? '<span class="badge" style="background:var(--accent-bg); color:var(--accent-text);">🎯 raggiunto</span>' : ""}`
+      : `<button class="target-set" data-settarget="${id}">imposta obiettivo di prezzo</button>`;
+    return `<div class="row">
+      <div class="row-main" data-open="${id}">
+        ${r.image_small ? `<img class="thumb" src="${r.image_small}" alt="" />` : `<div class="thumb"></div>`}
+        <div>
+          <p class="row-name">${r.name}</p>
+          <p class="row-sub">${r.set_name || ""} · ${goalText}</p>
+        </div>
+      </div>
+      <span style="font-size:13px; color:var(--text-secondary);">${fmtPrice(r.price_eur, "eur")}</span>
+    </div>`;
+  }).join("");
+  bindRowEvents();
+  document.querySelectorAll("[data-settarget]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = el.dataset.settarget;
+      const val = prompt("A quale prezzo in EUR vuoi essere avvisato? (es. 80)");
+      if (val && !isNaN(parseFloat(val))) {
+        const dir = confirm("Premi OK per 'avvisami quando SUPERA questo prezzo', Annulla per 'quando SCENDE sotto'.") ? "sopra" : "sotto";
+        wishlist[id] = { target: parseFloat(val), dir };
+        saveWishlist();
+        renderWishlist();
+      }
+    });
+  });
+}
+
+document.getElementById("search").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const sr = document.getElementById("searchResults");
+  const market = document.getElementById("marketFilter").value;
+  const time = document.getElementById("timeFilter").value;
+  if (!q) {
+    sr.style.display = "none";
+    sr.innerHTML = "";
+    document.getElementById("mainLists").style.display = "block";
+    return;
+  }
+  const matches = allRows.filter(r => r.name.toLowerCase().includes(q)).slice(0, 30);
+  document.getElementById("mainLists").style.display = "none";
+  sr.style.display = "block";
+  sr.innerHTML = matches.length
+    ? matches.map(r => rowHtml(r, market, time)).join("")
+    : `<p class="empty">Nessuna carta trovata.</p>`;
+  bindRowEvents();
+});
+
+["marketFilter", "timeFilter", "minPrice"].forEach(id =>
+  document.getElementById(id).addEventListener("change", renderLists)
+);
+
+loadData();
+</script>
+</body>
+</html>
