@@ -39,6 +39,10 @@ async function fetchPage(page) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const res = await fetch(url, { headers });
     if (res.ok) return res.json();
+    if (res.status === 404) {
+      // Pagina oltre l'ultima esistente: fine dei dati, non un errore vero.
+      return { data: [] };
+    }
     if (res.status === 429) {
       console.warn(`Rate limit alla pagina ${page}, riprovo tra ${attempt * 2}s...`);
       await new Promise((r) => setTimeout(r, attempt * 2000));
@@ -95,7 +99,7 @@ async function run() {
     totalCards += cards.length;
     console.log(`Pagina ${page}: ${cards.length} carte processate (totale finora: ${totalCards})`);
 
-    if (page * PAGE_SIZE >= data.totalCount) break;
+    if (cards.length < PAGE_SIZE) break; // ultima pagina (parziale o vuota)
     page++;
   }
 
